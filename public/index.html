@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1a1d27">
+<title>Step Tracker</title>
+<style>
+:root {
+  --bg:      #191c24;
+  --surface: #21253a;
+  --surf2:   #292e45;
+  --border:  #363c56;
+  --accent:  #818cf8;
+  --glow:    rgba(129,140,248,.16);
+  --green:   #4ade80;
+  --yellow:  #fbbf24;
+  --red:     #f87171;
+  --muted:   #8892b0;
+  --text:    #e8ecf8;
+  --radius:  12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); }
+
+/* ── App shell ── */
+.app { display: flex; height: 100dvh; overflow: hidden; }
+
+/* ── Sidebar overlay (mobile) ── */
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); z-index: 80;
+  backdrop-filter: blur(2px);
+}
+.sidebar-overlay.open { display: block; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 270px; min-width: 270px;
+  background: #1c2035; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+  z-index: 90;
+}
+
+/* ── Sidebar header ── */
+.sidebar-header {
+  padding: 18px 14px 12px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.app-brand {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 1rem; font-weight: 700; margin-bottom: 12px;
+}
+.brand-icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: linear-gradient(135deg, #818cf8, #6366f1);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; box-shadow: 0 2px 8px rgba(99,102,241,.35);
+}
+.conn-row { display: flex; align-items: center; justify-content: space-between; }
+.conn-badge { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--muted); }
+.conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: background .3s; flex-shrink: 0; }
+.conn-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.users-badge { font-size: 0.72rem; color: var(--muted); background: var(--surf2); border: 1px solid var(--border); border-radius: 99px; padding: 2px 8px; }
+
+.sidebar-trackers { flex: 1; overflow-y: auto; padding: 8px; }
+.sidebar-trackers::-webkit-scrollbar { width: 3px; }
+.sidebar-trackers::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.tracker-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 10px; border-radius: 10px; cursor: pointer;
+  transition: background .15s; margin-bottom: 3px;
+  border: 1px solid transparent; min-height: 48px;
+}
+.tracker-item:hover   { background: rgba(255,255,255,.05); }
+.tracker-item.active  { background: rgba(129,140,248,.13); border-color: rgba(129,140,248,.28); }
+.tracker-item-info    { flex: 1; min-width: 0; }
+.tracker-item-name    { font-size: 0.88rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tracker-item.active .tracker-item-name { color: #a5b4fc; }
+.tracker-item-meta    { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.tracker-mini-bar     { width: 30px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+.tracker-mini-fill    { height: 100%; background: var(--green); border-radius: 2px; transition: width .4s; }
+.tracker-item-actions { display: flex; gap: 2px; flex-shrink: 0; opacity: 0.4; transition: opacity .15s; }
+.tracker-item:hover .tracker-item-actions,
+.tracker-item.active .tracker-item-actions { opacity: 1; }
+@media (max-width: 640px) {
+  .tracker-item-actions { opacity: 1; }
+}
+.ti-btn {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 7px; transition: all .15s;
+}
+.ti-btn:hover { background: var(--surf2); color: var(--text); }
+.ti-btn.danger:hover { background: rgba(248,113,113,.12); color: var(--red); }
+
+.sidebar-footer { padding: 10px 8px 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.btn-new-tracker {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 11px 12px; border-radius: 10px; border: 1.5px dashed var(--border);
+  background: none; color: var(--muted); font-size: 0.84rem;
+  font-family: inherit; cursor: pointer; transition: all .18s; min-height: 44px;
+}
+.btn-new-tracker:hover { border-color: var(--accent); color: var(--accent); background: rgba(129,140,248,.08); }
+
+/* ── Main ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+/* ── Mobile top bar ── */
+.mobile-bar {
+  display: none; align-items: center; gap: 10px;
+  padding: 12px 14px; background: #1c2035;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.hamburger {
+  width: 40px; height: 40px; border-radius: 10px; background: var(--surf2);
+  border: 1px solid var(--border); color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; transition: background .15s;
+}
+.hamburger:hover { background: rgba(255,255,255,.08); }
+.mobile-tracker-name { flex: 1; font-size: 0.95rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Main header ── */
+.main-header {
+  padding: 18px 24px 14px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; background: var(--bg);
+}
+.main-title-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.main-title-edit {
+  background: none; border: none; color: var(--text);
+  font-size: 1.25rem; font-weight: 700; font-family: inherit;
+  flex: 1; outline: none; border-bottom: 2px solid transparent;
+  transition: border-color .2s; padding-bottom: 2px;
+  -webkit-appearance: none;
+}
+.main-title-edit:focus { border-color: var(--accent); }
+.main-desc-edit {
+  background: none; border: none; color: var(--muted);
+  font-size: 0.86rem; font-family: inherit; width: 100%;
+  outline: none; border-bottom: 2px solid transparent;
+  transition: border-color .2s; -webkit-appearance: none;
+}
+.main-desc-edit:focus { border-color: var(--accent); }
+.main-desc-edit::placeholder { color: #2e3450; }
+.header-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+.progress-row { display: flex; align-items: center; gap: 12px; }
+.progress-bar-bg { flex: 1; height: 6px; background: var(--surf2); border-radius: 99px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #4ade80); border-radius: 99px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+.progress-pct  { font-size: 0.85rem; font-weight: 700; color: var(--accent); min-width: 34px; text-align: right; }
+.progress-label{ font-size: 0.77rem; color: var(--muted); min-width: 100px; }
+.status-pills  { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; font-weight: 600; padding: 3px 10px; border-radius: 99px; letter-spacing:.2px; }
+.pill-todo       { background: rgba(136,146,176,.13); color: var(--muted); border: 1px solid rgba(136,146,176,.2); }
+.pill-inprogress { background: rgba(251,191,36,.1);   color: var(--yellow); border: 1px solid rgba(251,191,36,.2); }
+.pill-done       { background: rgba(74,222,128,.1);   color: var(--green);  border: 1px solid rgba(74,222,128,.2); }
+.pill-blocked    { background: rgba(248,113,113,.1);  color: var(--red);    border: 1px solid rgba(248,113,113,.2); }
+
+/* ── Steps body ── */
+.steps-body { flex: 1; overflow-y: auto; padding: 16px 18px 100px; -webkit-overflow-scrolling: touch; }
+.steps-body::-webkit-scrollbar { width: 4px; }
+.steps-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.step-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); position: relative; overflow: hidden;
+  transition: border-color .2s, box-shadow .2s, transform .15s; margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.step-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.step-card.s-todo::before       { background: var(--border); }
+.step-card.s-inprogress::before { background: var(--yellow); }
+.step-card.s-done::before       { background: var(--green); }
+.step-card.s-blocked::before    { background: var(--red); }
+.step-card:hover   { border-color: rgba(129,140,248,.3); box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.step-card.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--glow); }
+.step-card.dragging  { opacity: .35; transform: scale(.98); }
+
+.step-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 14px; cursor: pointer; min-height: 56px;
+}
+.drag-handle {
+  color: var(--muted); cursor: grab; display: flex; align-items: center;
+  opacity: .45; transition: opacity .15s; flex-shrink: 0; padding: 6px 2px;
+}
+.drag-handle:hover { opacity: 1; }
+.drag-handle:active { cursor: grabbing; }
+
+.step-num {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--surf2); border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.74rem; font-weight: 700; color: var(--muted);
+  flex-shrink: 0; transition: all .2s;
+}
+.s-done .step-num       { background: rgba(74,222,128,.12);  border-color: var(--green);  color: var(--green); }
+.s-inprogress .step-num { background: rgba(251,191,36,.11);  border-color: var(--yellow); color: var(--yellow); }
+.s-blocked .step-num    { background: rgba(248,113,113,.11); border-color: var(--red);    color: var(--red); }
+
+.step-info { flex: 1; min-width: 0; }
+.step-name-text { font-size: 0.92rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.s-done .step-name-text { text-decoration: line-through; color: var(--muted); }
+.step-sub { font-size: 0.74rem; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.step-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 99px; font-size: 0.69rem; font-weight: 600; letter-spacing: .2px; }
+.b-todo       { background: rgba(136,146,176,.12); color: var(--muted);  border: 1px solid rgba(136,146,176,.2); }
+.b-inprogress { background: rgba(251,191,36,.1);   color: var(--yellow); border: 1px solid rgba(251,191,36,.22); }
+.b-done       { background: rgba(74,222,128,.1);   color: var(--green);  border: 1px solid rgba(74,222,128,.22); }
+.b-blocked    { background: rgba(248,113,113,.1);  color: var(--red);    border: 1px solid rgba(248,113,113,.22); }
+
+.chevron-btn {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; padding: 6px; border-radius: 7px;
+  transition: all .15s; flex-shrink: 0; min-width: 32px; min-height: 32px; justify-content: center;
+}
+.chevron-btn:hover { color: var(--text); background: var(--surf2); }
+.chevron-btn svg { transition: transform .22s; }
+.chevron-btn.open svg { transform: rotate(180deg); }
+
+/* ── Step edit panel ── */
+.step-edit { display: none; padding: 0 14px 16px 52px; border-top: 1px solid rgba(255,255,255,.06); background: rgba(0,0,0,.12); }
+.step-edit.open { display: block; }
+.fe-label { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin: 13px 0 5px; }
+.fe-input, .fe-textarea, .fe-select {
+  width: 100%; background: var(--surf2); border: 1px solid var(--border);
+  border-radius: 9px; color: var(--text); font-family: inherit;
+  font-size: 0.9rem; padding: 10px 12px; outline: none; transition: border-color .2s;
+  -webkit-appearance: none;
+}
+.fe-input:focus, .fe-textarea:focus, .fe-select:focus { border-color: var(--accent); }
+.fe-textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+.fe-select {
+  appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; padding-right: 32px;
+}
+.fe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fe-row  { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+/* ── Add step area ── */
+.add-area { margin-top: 4px; border: 2px dashed var(--border); border-radius: var(--radius); padding: 14px; transition: border-color .2s; }
+.add-area.collapsed { cursor: pointer; }
+.add-area.collapsed:hover { border-color: var(--accent); }
+.add-trigger { display: flex; align-items: center; gap: 9px; }
+.add-trigger span { font-size: 0.86rem; color: var(--muted); }
+.add-form { display: none; }
+.add-form.open { display: block; }
+.add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.add-full { grid-column: 1 / -1; }
+.add-label { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+.add-input, .add-textarea {
+  width: 100%; background: var(--surf2); border: 1px solid var(--border);
+  border-radius: 9px; color: var(--text); font-family: inherit;
+  font-size: 0.9rem; padding: 10px 12px; outline: none; transition: border-color .2s;
+  -webkit-appearance: none;
+}
+.add-input:focus, .add-textarea:focus { border-color: var(--accent); }
+.add-input::placeholder, .add-textarea::placeholder { color: #4a5070; }
+.add-textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+.add-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 9px; border: none;
+  font-size: 0.82rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: all .18s; white-space: nowrap; min-height: 38px;
+}
+.btn-primary { background: linear-gradient(135deg, #818cf8, #6366f1); color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,.3); }
+.btn-primary:hover { background: linear-gradient(135deg, #a5b4fc, #818cf8); box-shadow: 0 4px 14px rgba(99,102,241,.4); }
+.btn-ghost { background: var(--surf2); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { background: rgba(255,255,255,.06); border-color: rgba(129,140,248,.4); }
+.btn-danger { background: rgba(248,113,113,.1); color: var(--red); border: 1px solid rgba(248,113,113,.22); }
+.btn-danger:hover { background: rgba(248,113,113,.18); }
+.btn-sm { padding: 7px 12px; font-size: 0.78rem; border-radius: 8px; min-height: 34px; }
+.btn-icon {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; padding: 8px; border-radius: 8px;
+  transition: all .15s; min-width: 36px; min-height: 36px; justify-content: center;
+}
+.btn-icon:hover { color: var(--red); background: rgba(248,113,113,.1); }
+
+/* ── Empty states ── */
+.empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); text-align: center; padding: 40px 20px; }
+.empty svg { margin-bottom: 14px; opacity: .35; }
+.empty p { font-size: 0.88rem; line-height: 1.7; }
+.empty-steps { text-align: center; padding: 40px 16px; color: var(--muted); }
+.empty-steps p { font-size: 0.86rem; line-height: 1.7; }
+
+/* ── Share modal ── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: flex-end; justify-content: center; z-index: 100; padding: 0; backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity .2s; }
+.overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: var(--surface); border: 1px solid rgba(255,255,255,.07); border-radius: 20px 20px 0 0; width: 100%; max-width: 560px; box-shadow: 0 -12px 50px rgba(0,0,0,.5); transform: translateY(100%); transition: transform .28s cubic-bezier(.4,0,.2,1); max-height: 85dvh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom); }
+.overlay.open .modal { transform: translateY(0); }
+.modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 10px auto 0; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 14px; border-bottom: 1px solid var(--border); }
+.modal-title { font-size: 1rem; font-weight: 700; }
+.modal-body { padding: 16px 20px 20px; }
+.modal-section { margin-bottom: 16px; }
+.modal-section-label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.share-box { background: rgba(0,0,0,.2); border: 1px solid var(--border); border-radius: 10px; padding: 11px; font-size: 0.8rem; line-height: 1.6; color: var(--text); font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 160px; overflow-y: auto; }
+.share-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* ── New tracker modal ── */
+.nt-body { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 12px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+.nt-label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; display: block; }
+.nt-input { width: 100%; background: var(--surf2); border: 1px solid var(--border); border-radius: 9px; color: var(--text); font-family: inherit; font-size: 1rem; padding: 11px 13px; outline: none; transition: border-color .2s; -webkit-appearance: none; }
+.nt-input:focus { border-color: var(--accent); }
+.nt-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── Toast ── */
+.toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(70px); background: var(--surface); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 10px 18px; font-size: 0.84rem; font-weight: 500; box-shadow: 0 8px 30px rgba(0,0,0,.5); z-index: 200; transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .25s; opacity: 0; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast-check { color: var(--green); }
+
+@keyframes flashUpdate { 0% { background: rgba(91,127,255,.15); } 100% { background: transparent; } }
+.step-card.updated { animation: flashUpdate .8s ease-out; }
+
+/* ── MOBILE BREAKPOINT ── */
+@media (max-width: 640px) {
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    transform: translateX(-100%); z-index: 90;
+    width: 82vw; max-width: 300px;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .mobile-bar { display: flex; }
+  .main-header { padding: 14px 16px 12px; }
+  .main-title-edit { font-size: 1.1rem; }
+  .steps-body { padding: 12px 14px 100px; }
+  .step-edit { padding-left: 14px; }
+  .fe-grid { grid-template-columns: 1fr; }
+  .add-grid { grid-template-columns: 1fr; }
+  .progress-label { display: none; }
+  .header-actions .btn span { display: none; }
+  .overlay { align-items: flex-end; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Sidebar overlay (mobile tap-to-close) -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="app-brand">
+        <div class="brand-icon">
+          <svg width="14" height="14" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="9 11 12 14 22 4"/>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          </svg>
+        </div>
+        Step Tracker
+      </div>
+      <div class="conn-row">
+        <div class="conn-badge">
+          <div class="conn-dot" id="connDot"></div>
+          <span id="connLabel">Connecting…</span>
+        </div>
+        <div class="users-badge" id="usersBadge">1 online</div>
+      </div>
+    </div>
+
+    <div class="sidebar-trackers" id="sidebarTrackers"></div>
+
+    <div class="sidebar-footer">
+      <button class="btn-new-tracker" onclick="openNewTrackerModal()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        New tracker
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <!-- Mobile top bar -->
+    <div class="mobile-bar">
+      <button class="hamburger" onclick="openSidebar()" aria-label="Open trackers">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <line x1="3" y1="6"  x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <span class="mobile-tracker-name" id="mobileTrackerName">Step Tracker</span>
+      <button class="btn btn-primary btn-sm" onclick="openShareModal()" style="padding:7px 12px">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        </svg>
+        <span>Share</span>
+      </button>
+    </div>
+
+    <!-- Desktop header (hidden on mobile via CSS for title row, share/delete shown differently) -->
+    <div class="main-header" id="mainHeader" style="display:none">
+      <div class="main-title-row">
+        <input class="main-title-edit" id="mainTitle" placeholder="Tracker name…"
+          onblur="saveTrackerMeta()" onkeydown="if(event.key==='Enter')this.blur()">
+        <div class="header-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openShareModal()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+            <span>Share</span>
+          </button>
+          <button class="btn-icon" onclick="deleteCurrentTracker()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <input class="main-desc-edit" id="mainDesc" placeholder="Add a description…"
+        onblur="saveTrackerMeta()" onkeydown="if(event.key==='Enter')this.blur()">
+      <div style="margin-top:12px">
+        <div class="progress-row">
+          <span class="progress-label" id="progressLabel">0 of 0 steps</span>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+          <span class="progress-pct" id="progressPct">0%</span>
+        </div>
+        <div class="status-pills" id="statusPills"></div>
+      </div>
+    </div>
+
+    <!-- Progress bar shown on mobile inside steps body header -->
+    <div id="mobileProgress" style="display:none; padding:10px 14px 4px; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0;">
+      <div class="progress-row">
+        <div class="progress-bar-bg" style="flex:1"><div class="progress-bar-fill" id="progressFillM" style="width:0%"></div></div>
+        <span class="progress-pct" id="progressPctM" style="font-size:.8rem">0%</span>
+      </div>
+      <div class="status-pills" id="statusPillsM" style="margin-top:6px"></div>
+    </div>
+
+    <div class="empty" id="emptyState">
+      <svg width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.4" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/>
+      </svg>
+      <p>Tap the menu to select a tracker<br>or create a new one.</p>
+    </div>
+
+    <div id="trackerView" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+      <!-- Desktop title area injected dynamically -->
+      <div id="desktopTitleArea"></div>
+
+      <div class="steps-body" id="stepsBody">
+        <div class="steps-list" id="stepsList"></div>
+        <!-- Add step -->
+        <div class="add-area collapsed" id="addArea" onclick="expandAdd(event)">
+          <div class="add-trigger" id="addTrigger">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--muted)">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+            <span>Add a step…</span>
+          </div>
+          <div class="add-form" id="addForm" onclick="event.stopPropagation()">
+            <div class="add-grid">
+              <div class="add-full">
+                <label class="add-label">Step name *</label>
+                <input class="add-input" id="addName" placeholder="e.g. Review requirements"
+                  onkeydown="if(event.key==='Enter')submitAdd(); if(event.key==='Escape')collapseAdd();">
+              </div>
+              <div class="add-full">
+                <label class="add-label">Description</label>
+                <textarea class="add-textarea" id="addDesc" placeholder="Optional details…"></textarea>
+              </div>
+              <div>
+                <label class="add-label">Assignee</label>
+                <input class="add-input" id="addAssignee" placeholder="Name or team">
+              </div>
+              <div>
+                <label class="add-label">Due date</label>
+                <input class="add-input" id="addDue" type="date">
+              </div>
+            </div>
+            <div class="add-actions">
+              <button class="btn btn-ghost btn-sm" onclick="collapseAdd()">Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick="submitAdd()">Add Step</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ── Share Modal ── -->
+<div class="overlay" id="shareOverlay" onclick="if(event.target===this)closeShareModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <span class="modal-title">Share Tracker</span>
+      <button class="btn-icon" onclick="closeShareModal()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-section-label">Direct link</div>
+        <div class="share-box" id="shareUrl"></div>
+        <div class="share-actions">
+          <button class="btn btn-ghost btn-sm" onclick="copyShareUrl()">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            Copy link
+          </button>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-label">Text summary</div>
+        <div class="share-box" id="shareText"></div>
+        <div class="share-actions">
+          <button class="btn btn-ghost btn-sm" onclick="copyShareText()">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            Copy text
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── New Tracker Modal ── -->
+<div class="overlay" id="newTrackerOverlay" onclick="if(event.target===this)closeNewTrackerModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <span class="modal-title">New Tracker</span>
+      <button class="btn-icon" onclick="closeNewTrackerModal()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="nt-body">
+      <div>
+        <label class="nt-label">Tracker name *</label>
+        <input class="nt-input" id="ntName" placeholder="e.g. Product Launch"
+          onkeydown="if(event.key==='Enter')submitNewTracker(); if(event.key==='Escape')closeNewTrackerModal();">
+      </div>
+      <div>
+        <label class="nt-label">Description</label>
+        <input class="nt-input" id="ntDesc" placeholder="Optional description…">
+      </div>
+      <div class="nt-actions">
+        <button class="btn btn-ghost btn-sm" onclick="closeNewTrackerModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="submitNewTracker()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <svg class="toast-check" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+  <span id="toastMsg">Done</span>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let trackers   = [];
+let steps      = [];
+let selectedId = null;
+let dragSrc    = null;
+let addOpen    = false;
+const expandedSteps = new Set();
+const isMobile = () => window.innerWidth <= 640;
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+let ws;
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}`);
+  ws.onopen  = () => { setConn(true); };
+  ws.onclose = () => { setConn(false); setTimeout(connectWS, 3000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = ({ data }) => {
+    const { type, data: d } = JSON.parse(data);
+    if (type === 'users_count')    { document.getElementById('usersBadge').textContent = `${d.count} online`; }
+    if (type === 'tracker_created'){ if (!trackers.find(t=>t.id===d.id)) { trackers.push(d); renderSidebar(); } }
+    if (type === 'tracker_updated'){ trackers = trackers.map(t=>t.id===d.id?d:t); renderSidebar(); if(selectedId===d.id){ document.getElementById('mainTitle').value=d.name; document.getElementById('mainDesc').value=d.description||''; document.getElementById('mobileTrackerName').textContent=d.name; } }
+    if (type === 'tracker_deleted'){ trackers=trackers.filter(t=>t.id!==d.id); renderSidebar(); if(selectedId===d.id){selectedId=null;showView(false);} }
+    if (type === 'step_created')   { if(d.tracker_id===selectedId){steps=steps.filter(s=>s.id!==d.id);steps.push(d);steps.sort((a,b)=>a.position-b.position||a.id-b.id);renderSteps();updateProgress();} }
+    if (type === 'step_updated')   { if(d.tracker_id===selectedId){steps=steps.map(s=>s.id===d.id?d:s);renderSteps();updateProgress();restoreExpanded();flashCard(d.id);} }
+    if (type === 'step_deleted')   { if(d.tracker_id===selectedId){steps=steps.filter(s=>s.id!==d.id);renderSteps();updateProgress();} }
+    if (type === 'steps_reordered'){ if(d.tracker_id===selectedId){const m=new Map(steps.map(s=>[s.id,s]));steps=d.order.map((id,i)=>({...m.get(id),position:i})).filter(Boolean);renderSteps();restoreExpanded();} }
+  };
+}
+function setConn(live) {
+  document.getElementById('connDot').className   = 'conn-dot'+(live?' live':'');
+  document.getElementById('connLabel').textContent = live ? 'Live' : 'Reconnecting…';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  connectWS();
+  trackers = await api('GET', '/api/trackers');
+  renderSidebar();
+  const hashId = parseInt(location.hash.replace('#tracker-',''));
+  const startId = trackers.find(t=>t.id===hashId)?.id || trackers[0]?.id;
+  if (startId) selectTracker(startId);
+}
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const r = await fetch(path, { method, headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const el = document.getElementById('sidebarTrackers');
+  if (!trackers.length) { el.innerHTML=`<div style="padding:12px 10px;font-size:.8rem;color:var(--muted)">No trackers yet</div>`; return; }
+  const pcts = {};
+  el.innerHTML = trackers.map(t => {
+    return `<div class="tracker-item ${t.id===selectedId?'active':''}" onclick="selectTracker(${t.id}); closeSidebar()">
+      <div class="tracker-item-info">
+        <div class="tracker-item-name">${esc(t.name)}</div>
+        <div class="tracker-item-meta" id="tMeta-${t.id}">—</div>
+      </div>
+      <div class="tracker-mini-bar" style="margin-right:4px"><div class="tracker-mini-fill" id="tBar-${t.id}" style="width:0%"></div></div>
+      <div class="tracker-item-actions" onclick="event.stopPropagation()">
+        <button class="ti-btn" title="Copy tracker" onclick="copyTracker(${t.id})">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
+        <button class="ti-btn danger" title="Delete tracker" onclick="deleteTracker(${t.id})">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          </svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateSidebarMeta() {
+  const total = steps.length;
+  const done  = steps.filter(s=>s.status==='done').length;
+  const pct   = total ? Math.round(done/total*100) : 0;
+  const meta  = document.getElementById(`tMeta-${selectedId}`);
+  const bar   = document.getElementById(`tBar-${selectedId}`);
+  if (meta) meta.textContent = `${pct}% complete`;
+  if (bar)  bar.style.width  = pct+'%';
+}
+
+function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebarOverlay').classList.add('open'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebarOverlay').classList.remove('open'); }
+
+// ── Select tracker ────────────────────────────────────────────────────────────
+async function selectTracker(id) {
+  selectedId = id;
+  const tracker = trackers.find(t=>t.id===id);
+  if (!tracker) return;
+  steps = await api('GET', `/api/trackers/${id}/steps`);
+  steps.sort((a,b)=>a.position-b.position||a.id-b.id);
+  document.getElementById('mainTitle').value = tracker.name;
+  document.getElementById('mainDesc').value  = tracker.description||'';
+  document.getElementById('mobileTrackerName').textContent = tracker.name;
+  collapseAdd();
+  showView(true);
+  renderSidebar();
+  renderSteps();
+  updateProgress();
+  history.replaceState(null,'',`#tracker-${id}`);
+}
+
+function showView(show) {
+  document.getElementById('emptyState').style.display   = show ? 'none'  : 'flex';
+  document.getElementById('trackerView').style.display  = show ? 'flex'  : 'none';
+  document.getElementById('mobileProgress').style.display = show ? 'block' : 'none';
+  // Desktop header shown inside trackerView
+  const mh = document.getElementById('mainHeader');
+  if (!isMobile()) mh.style.display = show ? 'block' : 'none';
+}
+
+// ── Progress ──────────────────────────────────────────────────────────────────
+function updateProgress() {
+  const total   = steps.length;
+  const done    = steps.filter(s=>s.status==='done').length;
+  const inprog  = steps.filter(s=>s.status==='inprogress').length;
+  const blocked = steps.filter(s=>s.status==='blocked').length;
+  const todo    = steps.filter(s=>s.status==='todo').length;
+  const pct     = total ? Math.round(done/total*100) : 0;
+  const pillsHtml = [
+    todo    ? `<span class="pill pill-todo">${todo} To Do</span>` : '',
+    inprog  ? `<span class="pill pill-inprogress">${inprog} In Progress</span>` : '',
+    done    ? `<span class="pill pill-done">${done} Done</span>` : '',
+    blocked ? `<span class="pill pill-blocked">${blocked} Blocked</span>` : '',
+  ].join('');
+  // Desktop
+  const pf = document.getElementById('progressFill');
+  const pp = document.getElementById('progressPct');
+  const pl = document.getElementById('progressLabel');
+  const ps = document.getElementById('statusPills');
+  if (pf) pf.style.width = pct+'%';
+  if (pp) pp.textContent = pct+'%';
+  if (pl) pl.textContent = `${done} of ${total} step${total!==1?'s':''}`;
+  if (ps) ps.innerHTML   = pillsHtml;
+  // Mobile
+  document.getElementById('progressFillM').style.width = pct+'%';
+  document.getElementById('progressPctM').textContent  = pct+'%';
+  document.getElementById('statusPillsM').innerHTML    = pillsHtml;
+  updateSidebarMeta();
+}
+
+// ── Steps rendering ───────────────────────────────────────────────────────────
+const SL = { todo:'To Do', inprogress:'In Progress', done:'Done', blocked:'Blocked' };
+const SB = { todo:'b-todo', inprogress:'b-inprogress', done:'b-done', blocked:'b-blocked' };
+
+function renderSteps() {
+  const list = document.getElementById('stepsList');
+  if (!steps.length) {
+    list.innerHTML=`<div class="empty-steps"><p>No steps yet.<br>Tap <strong>Add a step…</strong> below.</p></div>`;
+    return;
+  }
+  list.innerHTML = steps.map((s,i)=>{
+    const check = s.status==='done'
+      ? `<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`
+      : (i+1);
+    const sub = [s.assignee, s.due_date?`Due ${s.due_date}`:'', s.desc].filter(Boolean).join(' · ');
+    return `<div class="step-card s-${s.status}" id="card-${s.id}" draggable="true"
+         ondragstart="dragStart(event,${s.id})" ondragover="event.preventDefault();this.classList.add('drag-over')"
+         ondragleave="this.classList.remove('drag-over')" ondrop="dragDrop(event,${s.id})"
+         ondragend="this.classList.remove('dragging')">
+      <div class="step-row" onclick="toggleEdit(${s.id})">
+        <div class="drag-handle" ondragstart="dragStart(event,${s.id})" onclick="event.stopPropagation()">
+          <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+            <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+          </svg>
+        </div>
+        <div class="step-num">${check}</div>
+        <div class="step-info">
+          <div class="step-name-text">${esc(s.name)}</div>
+          ${sub?`<div class="step-sub">${esc(sub)}</div>`:''}
+        </div>
+        <div class="step-right">
+          <span class="badge ${SB[s.status]}">${SL[s.status]}</span>
+          <button class="chevron-btn ${expandedSteps.has(s.id)?'open':''}" id="chev-${s.id}">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="step-edit ${expandedSteps.has(s.id)?'open':''}" id="edit-${s.id}">
+        <label class="fe-label">Step name</label>
+        <input class="fe-input" value="${esc(s.name)}" oninput="fieldChange(${s.id},'name',this.value)">
+        <label class="fe-label">Description</label>
+        <textarea class="fe-textarea" oninput="fieldChange(${s.id},'desc',this.value)">${esc(s.desc||'')}</textarea>
+        <div class="fe-grid">
+          <div>
+            <label class="fe-label">Status</label>
+            <select class="fe-select" onchange="fieldChange(${s.id},'status',this.value)">
+              <option value="todo"       ${s.status==='todo'       ?'selected':''}>To Do</option>
+              <option value="inprogress" ${s.status==='inprogress' ?'selected':''}>In Progress</option>
+              <option value="done"       ${s.status==='done'       ?'selected':''}>Done</option>
+              <option value="blocked"    ${s.status==='blocked'    ?'selected':''}>Blocked</option>
+            </select>
+          </div>
+          <div>
+            <label class="fe-label">Assignee</label>
+            <input class="fe-input" value="${esc(s.assignee||'')}" placeholder="Name or team" oninput="fieldChange(${s.id},'assignee',this.value)">
+          </div>
+          <div>
+            <label class="fe-label">Due date</label>
+            <input class="fe-input" type="date" value="${s.due_date||''}" oninput="fieldChange(${s.id},'due_date',this.value)">
+          </div>
+          <div>
+            <label class="fe-label">Notes</label>
+            <input class="fe-input" value="${esc(s.notes||'')}" placeholder="Short note…" oninput="fieldChange(${s.id},'notes',this.value)">
+          </div>
+        </div>
+        <div class="fe-row">
+          <button class="btn btn-danger btn-sm" onclick="deleteStep(${s.id})">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            </svg>
+            Delete step
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Step edit ─────────────────────────────────────────────────────────────────
+function toggleEdit(id) {
+  if (expandedSteps.has(id)) expandedSteps.delete(id);
+  else expandedSteps.add(id);
+  renderSteps();
+}
+function restoreExpanded() { /* preserved via expandedSteps set during renderSteps */ }
+const pending = {};
+function fieldChange(id, field, value) {
+  steps = steps.map(s => s.id===id ? {...s,[field]:value} : s);
+  if (field==='status') { renderSteps(); updateProgress(); }
+  if (!pending[id]) pending[id]={};
+  pending[id][field]=value;
+  clearTimeout(pending[id]._t);
+  pending[id]._t = setTimeout(()=>saveStep(id), 600);
+}
+async function saveStep(id) {
+  const u={...pending[id]}; delete u._t; delete pending[id];
+  if (!Object.keys(u).length) return;
+  try { await api('PUT',`/api/steps/${id}`,u); }
+  catch(e) { toast('Save failed'); }
+}
+function flashCard(id) {
+  const c=document.getElementById(`card-${id}`);
+  if(c){c.classList.remove('updated');void c.offsetWidth;c.classList.add('updated');}
+}
+async function deleteStep(id) {
+  steps=steps.filter(s=>s.id!==id); renderSteps(); updateProgress();
+  await api('DELETE',`/api/steps/${id}`);
+  toast('Step deleted');
+}
+
+// ── Add step ──────────────────────────────────────────────────────────────────
+function expandAdd(e) {
+  if(addOpen) return; addOpen=true;
+  document.getElementById('addTrigger').style.display='none';
+  document.getElementById('addForm').classList.add('open');
+  document.getElementById('addArea').classList.remove('collapsed');
+  setTimeout(()=>document.getElementById('addName').focus(),40);
+}
+function collapseAdd() {
+  addOpen=false;
+  document.getElementById('addTrigger').style.display='flex';
+  document.getElementById('addForm').classList.remove('open');
+  document.getElementById('addArea').classList.add('collapsed');
+  ['addName','addDesc','addAssignee','addDue'].forEach(id=>document.getElementById(id).value='');
+}
+async function submitAdd() {
+  const name=document.getElementById('addName').value.trim();
+  if(!name){document.getElementById('addName').focus();return;}
+  collapseAdd();
+  const step=await api('POST',`/api/trackers/${selectedId}/steps`,{
+    name, description:document.getElementById('addDesc').value.trim(),
+    assignee:document.getElementById('addAssignee').value.trim(),
+    due_date:document.getElementById('addDue').value,
+  });
+  // WebSocket will fire step_created and add it; if WS is slow, add optimistically
+  if (!steps.find(s=>s.id===step.id)) {
+    steps.push(step);
+    steps.sort((a,b)=>a.position-b.position||a.id-b.id);
+    renderSteps(); updateProgress();
+  }
+  toast('Step added');
+}
+
+// ── Drag & drop ───────────────────────────────────────────────────────────────
+function dragStart(e,id) {
+  dragSrc=id;
+  setTimeout(()=>{const c=document.getElementById(`card-${id}`);if(c)c.classList.add('dragging');},0);
+  e.dataTransfer.effectAllowed='move';
+}
+async function dragDrop(e,targetId) {
+  e.preventDefault();
+  document.querySelectorAll('.step-card').forEach(c=>c.classList.remove('drag-over'));
+  if(!dragSrc||dragSrc===targetId){dragSrc=null;return;}
+  const fi=steps.findIndex(s=>s.id===dragSrc), ti=steps.findIndex(s=>s.id===targetId);
+  if(fi===-1||ti===-1){dragSrc=null;return;}
+  const r=[...steps]; const [m]=r.splice(fi,1); r.splice(ti,0,m);
+  steps=r.map((s,i)=>({...s,position:i})); dragSrc=null; renderSteps();
+  await api('POST',`/api/trackers/${selectedId}/steps/reorder`,{order:steps.map(s=>s.id)});
+}
+
+// ── Tracker meta ──────────────────────────────────────────────────────────────
+async function saveTrackerMeta() {
+  if(!selectedId) return;
+  const name=document.getElementById('mainTitle').value.trim();
+  const description=document.getElementById('mainDesc').value.trim();
+  if(!name) return;
+  await api('PUT',`/api/trackers/${selectedId}`,{name,description});
+  document.getElementById('mobileTrackerName').textContent=name;
+}
+async function deleteCurrentTracker() {
+  if(!selectedId) return;
+  deleteTracker(selectedId);
+}
+
+// ── Copy tracker ──────────────────────────────────────────────────────────────
+async function copyTracker(id) {
+  const src = trackers.find(t=>t.id===id);
+  if (!src) return;
+  try {
+    const newT = await api('POST', `/api/trackers/${id}/copy`, {});
+    trackers.push(newT);
+    renderSidebar();
+    selectTracker(newT.id);
+    closeSidebar();
+    toast(`Copied "${src.name}"`);
+  } catch(e) { toast('Copy failed'); }
+}
+
+// ── Delete tracker (from sidebar) ─────────────────────────────────────────────
+async function deleteTracker(id) {
+  const t = trackers.find(t=>t.id===id);
+  if (!confirm(`Delete "${t?.name}"? This removes all steps.`)) return;
+  await api('DELETE', `/api/trackers/${id}`);
+  trackers = trackers.filter(t=>t.id!==id);
+  if (selectedId === id) { selectedId=null; showView(false); }
+  renderSidebar();
+  if (!selectedId && trackers[0]) selectTracker(trackers[0].id);
+  toast('Tracker deleted');
+}
+
+// ── New tracker modal ─────────────────────────────────────────────────────────
+function openNewTrackerModal() {
+  document.getElementById('newTrackerOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('ntName').focus(),300);
+}
+function closeNewTrackerModal() {
+  document.getElementById('newTrackerOverlay').classList.remove('open');
+  document.getElementById('ntName').value='';
+  document.getElementById('ntDesc').value='';
+}
+async function submitNewTracker() {
+  const name=document.getElementById('ntName').value.trim();
+  if(!name){document.getElementById('ntName').focus();return;}
+  const t=await api('POST','/api/trackers',{name,description:document.getElementById('ntDesc').value.trim()});
+  trackers.push(t); closeNewTrackerModal(); closeSidebar(); selectTracker(t.id); toast('Tracker created');
+}
+
+// ── Share modal ───────────────────────────────────────────────────────────────
+function openShareModal() {
+  const url=`${location.origin}${location.pathname}#tracker-${selectedId}`;
+  document.getElementById('shareUrl').textContent=url;
+  const tracker=trackers.find(t=>t.id===selectedId);
+  const now=new Date().toLocaleString();
+  const done=steps.filter(s=>s.status==='done').length;
+  const pct=steps.length?Math.round(done/steps.length*100):0;
+  const icons={todo:'⬜',inprogress:'🔄',done:'✅',blocked:'🚫'};
+  let txt=`📋 ${tracker?.name||'Tracker'}\n`;
+  if(tracker?.description) txt+=`${tracker.description}\n`;
+  txt+=`\nStatus — ${now}\n${'─'.repeat(36)}\n`;
+  txt+=`Progress: ${done}/${steps.length} (${pct}%)\n\n`;
+  steps.forEach((s,i)=>{
+    txt+=`${icons[s.status]} Step ${i+1}: ${s.name}  [${SL[s.status]}]\n`;
+    if(s.assignee) txt+=`   👤 ${s.assignee}\n`;
+    if(s.due_date) txt+=`   📅 Due: ${s.due_date}\n`;
+  });
+  document.getElementById('shareText').textContent=txt;
+  document.getElementById('shareOverlay').classList.add('open');
+}
+function closeShareModal() { document.getElementById('shareOverlay').classList.remove('open'); }
+function copyShareUrl()  { navigator.clipboard.writeText(document.getElementById('shareUrl').textContent).then(()=>toast('Link copied!')); }
+function copyShareText() { navigator.clipboard.writeText(document.getElementById('shareText').textContent).then(()=>toast('Text copied!')); }
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let _tt;
+function toast(msg) {
+  document.getElementById('toastMsg').textContent=msg;
+  const el=document.getElementById('toast');
+  el.classList.add('show'); clearTimeout(_tt);
+  _tt=setTimeout(()=>el.classList.remove('show'),2400);
+}
+
+// ── Responsive: show desktop header when wide ─────────────────────────────────
+function handleResize() {
+  const mh=document.getElementById('mainHeader');
+  const mb=document.getElementById('mobile-bar');
+  if(!isMobile() && selectedId) mh.style.display='block';
+  else if(isMobile()) mh.style.display='none';
+}
+window.addEventListener('resize', handleResize);
+
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){closeShareModal();closeNewTrackerModal();collapseAdd();closeSidebar();}
+});
+
+init();
+</script>
+</body>
+</html>
