@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#1a1d27">
-<title>Step Tracker</title>
+<title>Process Tracker</title>
 <style>
 :root {
   --bg:      #191c24;
@@ -360,7 +360,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); }
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
           </svg>
         </div>
-        Step Tracker
+        Process Tracker
       </div>
       <div class="conn-row">
         <div class="conn-badge">
@@ -620,7 +620,7 @@ function connectWS() {
   ws.onmessage = ({ data }) => {
     const { type, data: d } = JSON.parse(data);
     if (type === 'users_count')    { document.getElementById('usersBadge').textContent = `${d.count} online`; }
-    if (type === 'tracker_created'){ if (!trackers.find(t=>t.id===d.id)) { trackers.push(d); renderSidebar(); } }
+    if (type === 'tracker_created'){ trackers = trackers.filter(t=>t.id!==d.id); trackers.push(d); renderSidebar(); }
     if (type === 'tracker_updated'){ trackers = trackers.map(t=>t.id===d.id?d:t); renderSidebar(); if(selectedId===d.id){ document.getElementById('mainTitle').value=d.name; document.getElementById('mainDesc').value=d.description||''; document.getElementById('mobileTrackerName').textContent=d.name; } }
     if (type === 'tracker_deleted'){ trackers=trackers.filter(t=>t.id!==d.id); renderSidebar(); if(selectedId===d.id){selectedId=null;showView(false);} }
     if (type === 'step_created')   { if(d.tracker_id===selectedId){steps=steps.filter(s=>s.id!==d.id);steps.push(d);steps.sort((a,b)=>a.position-b.position||a.id-b.id);renderSteps();updateProgress();} }
@@ -967,7 +967,11 @@ async function submitNewTracker() {
   const name=document.getElementById('ntName').value.trim();
   if(!name){document.getElementById('ntName').focus();return;}
   const t=await api('POST','/api/trackers',{name,description:document.getElementById('ntDesc').value.trim()});
-  trackers.push(t); closeNewTrackerModal(); closeSidebar(); selectTracker(t.id); toast('Tracker created');
+  closeNewTrackerModal(); closeSidebar();
+  // De-dupe then add (WS may have already added it)
+  if (!trackers.find(tr=>tr.id===t.id)) trackers.push(t);
+  renderSidebar();
+  selectTracker(t.id); toast('Tracker created');
 }
 
 // ── Share modal ───────────────────────────────────────────────────────────────
