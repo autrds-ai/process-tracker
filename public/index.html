@@ -595,6 +595,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); }
 </div>
 
 <script>
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let trackers   = [];
 let steps      = [];
