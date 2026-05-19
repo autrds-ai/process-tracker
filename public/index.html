@@ -396,6 +396,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); }
         </svg>
       </button>
       <span class="mobile-tracker-name" id="mobileTrackerName">Step Tracker</span>
+      <button class="btn btn-ghost btn-sm" onclick="copyTracker(selectedId)" style="padding:7px 12px">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        <span>Copy</span>
+      </button>
       <button class="btn btn-primary btn-sm" onclick="openShareModal()" style="padding:7px 12px">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
@@ -412,6 +419,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); }
         <input class="main-title-edit" id="mainTitle" placeholder="Tracker name…"
           onblur="saveTrackerMeta()" onkeydown="if(event.key==='Enter')this.blur()">
         <div class="header-actions">
+          <button class="btn btn-ghost btn-sm" onclick="copyTracker(selectedId)">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="9" y="9" width="13" height="13" rx="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span>Copy</span>
+          </button>
           <button class="btn btn-ghost btn-sm" onclick="openShareModal()">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
